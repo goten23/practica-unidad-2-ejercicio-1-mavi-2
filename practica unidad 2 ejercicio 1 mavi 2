@@ -1,0 +1,100 @@
+#include <iostream>
+#include <Box2D/Box2D.h>
+#include <SDL2/SDL.h>
+
+const float32 WORLD_WIDTH = 100.0f;
+const float32 WORLD_HEIGHT = 100.0f;
+const float32 BLOCK_WIDTH = 5.0f;
+const float32 BLOCK_HEIGHT = 5.0f;
+
+int main(int argc, char* argv[]) {
+    // Inicialización de SDL
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+        std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
+        return 1;
+    }
+
+    SDL_Window* window = SDL_CreateWindow("Simulación de Caída de Bloque", 100, 100, 800, 600, SDL_WINDOW_SHOWN);
+    if (window == nullptr) {
+        std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (renderer == nullptr) {
+        SDL_DestroyWindow(window);
+        std::cerr << "SDL_CreateRenderer Error: " << SDL_GetError() << std::endl;
+        SDL_Quit();
+        return 1;
+    }
+
+    // Configuración del mundo de Box2D
+    b2Vec2 gravity(0.0f, -9.8f);
+    b2World world(gravity);
+
+    // Creación del piso
+    b2BodyDef groundBodyDef;
+    groundBodyDef.position.Set(WORLD_WIDTH / 2.0f, 10.0f);
+    b2Body* groundBody = world.CreateBody(&groundBodyDef);
+
+    b2PolygonShape groundBox;
+    groundBox.SetAsBox(WORLD_WIDTH / 2.0f, 10.0f);
+    groundBody->CreateFixture(&groundBox, 0.0f);
+
+    // Creación del bloque
+    b2BodyDef blockBodyDef;
+    blockBodyDef.type = b2_dynamicBody;
+    blockBodyDef.position.Set(WORLD_WIDTH / 2.0f, WORLD_HEIGHT - BLOCK_HEIGHT);
+    b2Body* blockBody = world.CreateBody(&blockBodyDef);
+
+    b2PolygonShape blockBox;
+    blockBox.SetAsBox(BLOCK_WIDTH / 2.0f, BLOCK_HEIGHT / 2.0f);
+
+    b2FixtureDef blockFixtureDef;
+    blockFixtureDef.shape = &blockBox;
+    blockFixtureDef.density = 1.0f;
+    blockFixtureDef.friction = 0.3f;
+    blockFixtureDef.restitution = 0.5f;
+    blockBody->CreateFixture(&blockFixtureDef);
+
+    // Bucle principal
+    bool quit = false;
+    SDL_Event e;
+
+    while (!quit) {
+        while (SDL_PollEvent(&e) != 0) {
+            if (e.type == SDL_QUIT) {
+                quit = true;
+            }
+        }
+
+        world.Step(1.0f / 60.0f, 6, 2);
+
+        SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+        SDL_RenderClear(renderer);
+
+        // Renderizar el piso
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        SDL_Rect groundRect = {0, 580, 800, 20};
+        SDL_RenderFillRect(renderer, &groundRect);
+
+        // Renderizar el bloque
+        b2Vec2 position = blockBody->GetPosition();
+        SDL_Rect blockRect = {
+            static_cast<int>(position.x * 800.0f / WORLD_WIDTH - BLOCK_WIDTH * 800.0f / WORLD_WIDTH / 2.0f),
+            600 - static_cast<int>(position.y * 600.0f / WORLD_HEIGHT + BLOCK_HEIGHT * 600.0f / WORLD_HEIGHT / 2.0f),
+            static_cast<int>(BLOCK_WIDTH * 800.0f / WORLD_WIDTH),
+            static_cast<int>(BLOCK_HEIGHT * 600.0f / WORLD_HEIGHT)
+        };
+        SDL_RenderFillRect(renderer, &blockRect);
+
+        SDL_RenderPresent(renderer);
+    }
+
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    SDL_Quit();
+
+    return 0;
+}
